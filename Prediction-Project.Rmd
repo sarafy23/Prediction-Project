@@ -1,0 +1,81 @@
+---
+title: "Prediction Assignment"
+date: "5/16/2021"
+output: html_document
+---
+
+# Executive Summary
+
+In this project we will build a prediction model from data on barbell lifts done correctly and incorrectly in 5 different ways by  6 participants.
+The goal of the project is to predict the manner in which they did the exercise with the prediction outcome being the variable "classe" in the training set.This project will determine which of the other variables to predict with and will then use the prediction model to predict 20 different test cases. 
+
+
+```{r setup and download data}
+library(caret)
+library(corrplot)
+training<-read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",na.strings=c("NA","","#DIV/0!"))
+
+quiz_set<-read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",na.strings=c("NA","","#DIV/0!"))
+
+```
+
+## Cleaning the Data
+
+Here we will remove informational variables as well as those with zero variance across samples as they are not useful for prediction.
+
+```{r remove informational and NZV variables}
+
+training2<-training[,-c(1:7)] #filter out informational cols since they are not needed for model prediction
+
+#remove near zero variance variables. that is, variables that are constant/near constant across samples
+nzv <- nearZeroVar(training2)
+training3 <- training2[ , -nzv]
+
+```
+
+Here, our standard treatment for NA's is to remove variables that have them. However, this may not be the best method with a better method being imputation.
+
+```{r remove NAs}
+
+#Remove variables that are  NA.
+na_var <- sapply(training3, function(x) sum(is.na(x)))  
+# alt. apply(training3,2, function(x) sum(is.na(x)))>0 and then do == FALSE, or do it like with ==0
+
+training4 <- training3[ , na_var == 0]  #alt. training3[,colSums(is.na(training2)) == 0] . NOTE : complete.cases is for ROWS NOT COLS (i.e variables)
+
+```
+
+## Correlation Matrix
+
+A quick visualization is done to see how the variables correlate. The AOE (Angular Order of Eigenvectors) method is used, which orders based on variable similarity calculated as
+the angular distance between variables on an eigenvector plot.
+
+```{r correlation matrix}
+
+corr_mat <- cor(training4[ , -53])
+#AOE : angles between vectors on an eigenvector plot approximate correlations
+#so an ordering based on the angular positions of these vectors naturally places the most similar variables contiguously.
+corrplot(corr_mat, order = "AOE", method = "circle", type = "full", tl.cex = 0.55, tl.col = rgb(.3, .3, .3))
+
+```
+
+## Model Fit
+
+Here we fit the model using random forest since these models are known for their very high accuracy. We use k-fold cross-validation method as a resampling method
+
+```{r Fit Model, eval=F}
+
+#fit a random forest model with cross-validation
+
+fit<-train(classe ~ .,method="rf",data=training4, trControl = trainControl(method = "cv"))
+
+fit$finalModel
+varImp(fit)
+pred<-predict(fit,quiz_set) #note to self: no need to do anything to quiz DS because model only uses variables from the quiz DS on which it was built in the training DS
+pred
+
+```
+
+## Conclusion
+
+The random forest model produces a very high accuracy prediction. The OOB is very low.
